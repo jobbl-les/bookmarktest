@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Bookmark Test</title>
+<meta name="description" content="Hello world PWA — add it to your home screen." />
+
+<link rel="manifest" href="manifest.webmanifest" />
+<meta name="theme-color" content="#4c1d95" />
+
+<!-- iOS home screen support -->
+<link rel="apple-touch-icon" href="icon-180.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Bookmark" />
+
+<link rel="icon" href="favicon.png" />
+
+<style>
+  :root {
+    --bg-top: #6d28d9;
+    --bg-bottom: #3b0764;
+    --card: rgba(255, 255, 255, 0.08);
+    --card-border: rgba(255, 255, 255, 0.16);
+    --text: #f5f3ff;
+    --muted: #c4b5fd;
+    --accent: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    min-height: 100%;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text);
+    background: linear-gradient(180deg, var(--bg-top), var(--bg-bottom));
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    padding-top: max(24px, env(safe-area-inset-top));
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 24px;
+    padding: 32px 28px;
+    text-align: center;
+    backdrop-filter: blur(8px);
+  }
+  .icon {
+    width: 88px;
+    height: 88px;
+    border-radius: 20px;
+    display: block;
+    margin: 0 auto 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+  h1 {
+    font-size: 26px;
+    margin: 0 0 8px;
+  }
+  p.lead {
+    color: var(--muted);
+    margin: 0 0 28px;
+    line-height: 1.5;
+    font-size: 15px;
+  }
+  button.install {
+    appearance: none;
+    border: none;
+    width: 100%;
+    padding: 16px 20px;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 14px;
+    background: var(--accent);
+    color: #3b0764;
+    cursor: pointer;
+    transition: transform 0.08s ease, opacity 0.2s ease;
+  }
+  button.install:active { transform: scale(0.98); }
+  button.install:disabled { opacity: 0.5; cursor: default; }
+
+  .status {
+    margin-top: 18px;
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.5;
+  }
+  .status.success { color: #86efac; }
+
+  .instructions {
+    margin-top: 18px;
+    text-align: left;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 14px;
+    padding: 16px 18px;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--text);
+    display: none;
+  }
+  .instructions.show { display: block; }
+  .instructions ol { margin: 0; padding-left: 20px; }
+  .instructions .share-icon {
+    display: inline-block;
+    padding: 0 4px;
+    font-weight: 700;
+  }
+
+  .hidden { display: none !important; }
+
+  footer {
+    margin-top: 22px;
+    font-size: 12px;
+    color: var(--muted);
+    opacity: 0.7;
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <img class="icon" src="icon-192.png" alt="" width="88" height="88" />
+    <h1>Hello 👋</h1>
+    <p class="lead">This is a tiny test page. Add it to your home screen and you'll get an app icon that jumps straight back here — no browser bar, no re‑typing a URL.</p>
+
+    <button class="install" id="install-btn" disabled>Checking your browser…</button>
+
+    <div class="instructions" id="ios-instructions">
+      <strong>To install on iPhone/iPad:</strong>
+      <ol>
+        <li>Tap the <span class="share-icon">Share</span> icon in Safari's toolbar</li>
+        <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
+        <li>Tap <strong>Add</strong> in the top right</li>
+      </ol>
+    </div>
+
+    <div class="instructions" id="fallback-instructions">
+      <strong>To install:</strong>
+      <p style="margin:8px 0 0;">Open your browser menu and look for <strong>Add to Home Screen</strong> or <strong>Install App</strong>. If you don't see it, this page is still bookmarkable the normal way.</p>
+    </div>
+
+    <p class="status" id="status"></p>
+    <footer>bookmarktest · jobbl-les</footer>
+  </main>
+
+<script>
+  const installBtn = document.getElementById("install-btn");
+  const statusEl = document.getElementById("status");
+  const iosInstructions = document.getElementById("ios-instructions");
+  const fallbackInstructions = document.getElementById("fallback-instructions");
+
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isStandalone =
+    window.matchMedia("(display-mode: standalone)").matches ||
+    window.navigator.standalone === true;
+
+  let deferredPrompt = null;
+
+  function setStatus(text, success) {
+    statusEl.textContent = text;
+    statusEl.classList.toggle("success", !!success);
+  }
+
+  function showAlreadyInstalled() {
+    installBtn.textContent = "You're using the installed app ✓";
+    installBtn.disabled = true;
+    setStatus("Nice — this is running from your home screen icon.", true);
+  }
+
+  if (isStandalone) {
+    showAlreadyInstalled();
+  } else if (isIOS) {
+    // iOS never fires beforeinstallprompt — show manual steps.
+    installBtn.textContent = "How to add to Home Screen";
+    installBtn.disabled = false;
+    installBtn.addEventListener("click", () => {
+      iosInstructions.classList.add("show");
+      fallbackInstructions.classList.remove("show");
+    });
+  } else {
+    // Default: wait briefly to see if beforeinstallprompt fires (Chrome/Edge/Android).
+    installBtn.textContent = "Add to Home Screen";
+    installBtn.disabled = true;
+
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      deferredPrompt = event;
+      installBtn.disabled = false;
+      installBtn.textContent = "Add to Home Screen";
+    });
+
+    installBtn.addEventListener("click", async () => {
+      if (!deferredPrompt) {
+        fallbackInstructions.classList.add("show");
+        return;
+      }
+      installBtn.disabled = true;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      if (outcome === "accepted") {
+        setStatus("Installing… check your home screen.", true);
+      } else {
+        setStatus("No worries — you can install any time from this page.");
+        installBtn.disabled = false;
+      }
+    });
+
+    // If no install prompt shows up shortly, offer the generic fallback.
+    setTimeout(() => {
+      if (!deferredPrompt && installBtn.disabled) {
+        installBtn.disabled = false;
+        installBtn.textContent = "Add to Home Screen";
+        installBtn.addEventListener(
+          "click",
+          () => fallbackInstructions.classList.add("show"),
+          { once: true }
+        );
+      }
+    }, 1500);
+  }
+
+  window.addEventListener("appinstalled", () => {
+    deferredPrompt = null;
+    showAlreadyInstalled();
+  });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
